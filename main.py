@@ -9,7 +9,7 @@ from tkinter import ttk, messagebox
 import datetime
 
 # ==========================================
-# 1. إخفاء الشاشة السوداء (Console) فوراً
+# 1. Hide the black console window immediately
 # ==========================================
 def hide_console():
     hwnd = ctypes.windll.kernel32.GetConsoleWindow()
@@ -361,13 +361,13 @@ class BlockApp(tk.Tk):
     def remove_site(self, site):
         t = LANG_DATA[self.lang]
         
-        # التأكد من المستخدم لإغلاق المتصفح لضمان فك الحظر الفعلي
+        # Confirm with the user before closing the browser to ensure the unblocking takes effect properly
         confirm = messagebox.askokcancel(t['warn_title'], t['warn_msg'])
         if not confirm: return
 
         base, www_base = clean_domain(site)
         
-        # 1. إزالة دقيقة من ملف hosts عبر الفصل بـ (split) لتجنب الأخطاء
+        # 1. Remove entries from the hosts file using split() to avoid errors
         try:
             with open(HOSTS_PATH, 'r') as file:
                 lines = file.readlines()
@@ -376,21 +376,21 @@ class BlockApp(tk.Tk):
                 for line in lines:
                     parts = line.strip().split()
                     if len(parts) >= 2 and parts[0] == '127.0.0.1' and parts[1] in [base, www_base]:
-                        continue # تخطي سطر الموقع المحدد
+                        continue  # Skip the selected site line
                     file.write(line)
         except:
             pass
 
-        # 2. تحديث قائمة الإعدادات الداخلية
+        # 2. Update the internal settings list
         if base in self.settings['sites']:
             self.settings['sites'].remove(base)
             self.save_settings()
             self.refresh_list()
             
-            # 3. مسح كاش النظام
+            # 3. Clear the system DNS cache
             os.system("ipconfig /flushdns")
-            
-            # 4. تحديث حالة الشبكة
+
+            # 4. Refresh the network state
             self.evaluate_schedule(force_refresh=True)
 
     def refresh_list(self):
@@ -410,7 +410,7 @@ class BlockApp(tk.Tk):
             btn.pack(side=tk.RIGHT if self.lang == 'en' else tk.LEFT, padx=10)
 
     # ==========================================
-    # وظائف الجدولة والعمل في الخلفية (Background)
+    # Scheduling and background task functions
     # ==========================================
     def show_toast(self, title, msg):
         toast = tk.Toplevel(self)
@@ -447,7 +447,7 @@ class BlockApp(tk.Tk):
             if self.settings['sites']:
                 with open(HOSTS_PATH, 'w') as file:
                     file.writelines(clean_lines)
-                    # معالجة مشكلة السطور المتداخلة
+                    # Handle the issue of overlapping lines
                     if clean_lines and not clean_lines[-1].endswith('\n'):
                         file.write('\n')
                     for site in self.settings['sites']:

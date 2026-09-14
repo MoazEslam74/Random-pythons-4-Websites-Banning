@@ -1,0 +1,5 @@
+# Ignore build folders and executable files
+build/
+dist/
+build_exe.py
+*.spec
