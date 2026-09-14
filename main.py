@@ -2,7 +2,7 @@ import sys
 import ctypes
 import winreg
 
-# Dictionary of texts to support both Arabic and English
+# Interface messages for both languages
 messages = {
     'ar': {
         'menu_title': "\n=== أداة التحكم في الوصول ليوتيوب ===",
@@ -12,12 +12,12 @@ messages = {
         'opt_exit': "[4] خروج",
         'prompt': "اختر الإجراء المطلوب: ",
         'hosts_blocked': "[+] تم حظر يوتيوب في ملف hosts بنجاح.",
-        'doh_disabled': "[+] تم تعطيل DoH بنجاح في متصفح",
+        'doh_disabled': "[+] تم تعطيل DoH بنجاح في متصفح:",
         'hosts_unblocked': "[-] تم فك حظر يوتيوب من ملف hosts بنجاح.",
-        'doh_enabled': "[-] تم إلغاء قيود DoH بنجاح من متصفح",
+        'doh_enabled': "[-] تم إلغاء قيود DoH بنجاح من متصفح:",
         'error_hosts': "[!] حدث خطأ أثناء تعديل hosts",
         'error_registry': "[!] حدث خطأ أثناء تعديل السجل",
-        'restart_note': "\n* ملاحظة: يرجى إعادة تشغيل المتصفح لتطبيق التغييرات.",
+        'restart_note': "\n* ملاحظة: يرجى إعادة تشغيل المتصفحات لتطبيق التغييرات.",
         'exit_msg': "جاري إغلاق الأداة...",
         'invalid_choice': "خيار غير صحيح، الرجاء المحاولة مرة أخرى."
     },
@@ -29,19 +29,53 @@ messages = {
         'opt_exit': "[4] Exit",
         'prompt': "Select an action: ",
         'hosts_blocked': "[+] YouTube was successfully blocked in the hosts file.",
-        'doh_disabled': "[+] DoH policy successfully disabled for",
+        'doh_disabled': "[+] DoH policy successfully disabled for:",
         'hosts_unblocked': "[-] YouTube was successfully unblocked in the hosts file.",
-        'doh_enabled': "[-] DoH policy successfully removed for",
+        'doh_enabled': "[-] DoH policy successfully removed for:",
         'error_hosts': "[!] Error modifying hosts",
         'error_registry': "[!] Error modifying registry",
-        'restart_note': "\n* Note: Please restart your browser to apply changes.",
+        'restart_note': "\n* Note: Please restart your browsers to apply changes.",
         'exit_msg': "Closing tool...",
         'invalid_choice': "Invalid choice, please try again."
     }
 }
 
+# Browser template (you can easily add any new browser here)
+BROWSER_POLICIES = {
+    "Google Chrome": {
+        "path": r"SOFTWARE\Policies\Google\Chrome",
+        "key": "DnsOverHttpsMode",
+        "value": "off",
+        "type": winreg.REG_SZ
+    },
+    "Microsoft Edge": {
+        "path": r"SOFTWARE\Policies\Microsoft\Edge",
+        "key": "DnsOverHttpsMode",
+        "value": "off",
+        "type": winreg.REG_SZ
+    },
+    "Brave Browser": {
+        "path": r"SOFTWARE\Policies\BraveSoftware\Brave",
+        "key": "DnsOverHttpsMode",
+        "value": "off",
+        "type": winreg.REG_SZ
+    },
+    "Vivaldi": {
+        "path": r"SOFTWARE\Policies\Vivaldi",
+        "key": "DnsOverHttpsMode",
+        "value": "off",
+        "type": winreg.REG_SZ
+    },
+    "Mozilla Firefox": {
+        # Firefox uses different data types and values (DWORD instead of String)
+        "path": r"SOFTWARE\Policies\Mozilla\Firefox\DNSOverHTTPS",
+        "key": "Enabled",
+        "value": 0, 
+        "type": winreg.REG_DWORD
+    }
+}
+
 def is_admin():
-    """Check whether the script is running with administrator privileges"""
     try:
         return ctypes.windll.shell32.IsUserAnAdmin()
     except:
@@ -61,7 +95,6 @@ def block_youtube(lang):
         print(f"{messages[lang]['error_hosts']}: {e}")
 
 def unblock_youtube(lang):
-    """Remove YouTube domains from the hosts file"""
     hosts_path = r"C:\Windows\System32\drivers\etc\hosts"
     websites_to_block = ["youtube.com", "www.youtube.com"]
     try:
@@ -76,41 +109,31 @@ def unblock_youtube(lang):
         print(f"{messages[lang]['error_hosts']}: {e}")
 
 def disable_browser_doh(lang):
-    policies = {
-        r"SOFTWARE\Policies\Google\Chrome": ("DnsOverHttpsMode", "off", winreg.REG_SZ),
-        r"SOFTWARE\Policies\Microsoft\Edge": ("DnsOverHttpsMode", "off", winreg.REG_SZ)
-    }
-    for registry_path, (val_name, val_data, val_type) in policies.items():
+    for browser_name, config in BROWSER_POLICIES.items():
         try:
-            key = winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, registry_path, 0, winreg.KEY_SET_VALUE)
-            winreg.SetValueEx(key, val_name, 0, val_type, val_data)
+            # CreateKeyEx creates the path automatically if it does not already exist
+            key = winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, config['path'], 0, winreg.KEY_SET_VALUE)
+            winreg.SetValueEx(key, config['key'], 0, config['type'], config['value'])
             winreg.CloseKey(key)
-            browser_name = registry_path.split("\\")[-1]
             print(f"{messages[lang]['doh_disabled']} {browser_name}")
         except Exception as e:
-            print(f"{messages[lang]['error_registry']} ({registry_path}): {e}")
+            print(f"{messages[lang]['error_registry']} ({browser_name}): {e}")
 
 def enable_browser_doh(lang):
-    """Remove the policy from the registry so the browser can return to its default state"""
-    policies = [
-        r"SOFTWARE\Policies\Google\Chrome",
-        r"SOFTWARE\Policies\Microsoft\Edge"
-    ]
-    for registry_path in policies:
+    for browser_name, config in BROWSER_POLICIES.items():
         try:
-            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, registry_path, 0, winreg.KEY_SET_VALUE)
-            winreg.DeleteValue(key, "DnsOverHttpsMode")
+            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, config['path'], 0, winreg.KEY_SET_VALUE)
+            winreg.DeleteValue(key, config['key'])
             winreg.CloseKey(key)
-            browser_name = registry_path.split("\\")[-1]
             print(f"{messages[lang]['doh_enabled']} {browser_name}")
         except FileNotFoundError:
-            # If the policy does not exist in the first place (which is the desired state), skip it quietly
+            # If the policy does not exist, ignore it quietly
             pass
         except Exception as e:
-            print(f"{messages[lang]['error_registry']} ({registry_path}): {e}")
+            print(f"{messages[lang]['error_registry']} ({browser_name}): {e}")
 
 def main_menu():
-    lang = 'ar'  # Default language
+    lang = 'ar' 
     while True:
         print(messages[lang]['menu_title'])
         print(messages[lang]['opt_block'])
@@ -140,5 +163,4 @@ if __name__ == "__main__":
     if is_admin():
         main_menu()
     else:
-        # Re-request administrator execution if privileges are not available
         ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, " ".join(sys.argv), None, 1)
